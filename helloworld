@@ -1,0 +1,307 @@
+#!/bin/bash
+# ---------------------------------------------------------------------------
+# helloworld - hello goodbeye world.
+
+# Copyright 2015, Johan De Schinckel,Room 1,0475227532,0475227532,jods <jods@rotowari>
+  
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License at <http://www.gnu.org/licenses/> for
+# more details.
+
+# Usage: helloworld [-h|--help] [-g]
+
+# Revision history:
+# 2015-02-13 Created by new_script ver. 3.3
+# ---------------------------------------------------------------------------
+
+PROGNAME=${0##*/}
+VERSION="0.1"
+
+clean_up() { # Perform pre-exit housekeeping
+  return
+}
+
+error_exit() {
+  echo -e "${PROGNAME}: ${1:-"Unknown Error"}" >&2
+  clean_up
+  exit 1
+}
+
+graceful_exit() {
+  clean_up
+  exit
+}
+
+signal_exit() { # Handle trapped signals
+  case $1 in
+    INT)
+      error_exit "Program interrupted by user" ;;
+    TERM)
+      echo -e "\n$PROGNAME: Program terminated" >&2
+      graceful_exit ;;
+    *)
+      error_exit "$PROGNAME: Terminating on unknown signal" ;;
+  esac
+}
+
+usage() {
+  echo -e "Usage: $PROGNAME [-h|--help] [-g]"
+}
+
+help_message() {
+  cat <<- _EOF_
+  $PROGNAME ver. $VERSION
+  Echo hello or goodbeye world.
+
+  $(usage)
+
+  Options:
+  -h, --help  Display this help message and exit.
+              No arguments echo's hello,
+  -g          echo goodbeye
+
+_EOF_
+  return
+}
+
+# Trap signals
+trap "signal_exit TERM" TERM HUP
+trap "signal_exit INT"  INT
+
+
+
+# Parse command-line
+while [[ -n $1 ]]; do
+  case $1 in
+    -h | --help)
+      help_message; graceful_exit ;;
+    -g)
+      hello=goodbeye ;;
+    -* | --*)
+      usage
+      error_exit "Unknown option $1" ;;
+    *)
+      echo "Argument $1 to process..." ;;
+  esac
+  shift
+done
+
+# Main logic
+#echo ""
+
+if [ ! ${!hello[@]} ]; then
+hour=$(date +"%H")
+case "`date +%a`" in
+	Sun|Sat) day=weekend ;;
+	Mon|Tue|Wed|Thu|Fri) day=weekday ;;
+esac
+if [ $hour -ge 5 -a $hour -lt 9 ]; then
+	newelem="G'morning"
+# if it is midafternoon to evening ( before 6 pm) will say G'noon
+elif [ $hour -ge 9 -a $hour -lt 12 ]
+then
+	newelem="G'day"
+elif [ $hour -ge 12 -a $hour -lt 13 ]
+then
+	newelem="G'noon"
+elif [ $hour -ge 13 -a $hour -lt 15 ]
+then
+	newelem="G'day"
+elif [ $hour -ge 15 -a $hour -lt 17 ]
+then
+	newelem="G'Afternoon"
+elif [ $hour -ge 17 -a $hour -lt 18 ]
+then
+	newelem="G'day"
+elif [ $hour -ge 18 -a $hour -lt 23 ]
+then
+	newelem="G'evening"
+elif [ $hour -ge 23 ] || [ $hour -lt 5 ]
+then
+	newelem="G'night"
+# it is good evening till midnight
+fi
+arr=(Ahoy Greetings Hello "Hello there" Hey Hi "Hi there" "How are you?" "How are you doing?" "How's it going?" Howdy Salutations Welcome "What's up?" Yo Sup "How art thou?")
+arr=( "${arr[@]}" "$newelem" ) # from right
+echo "${arr[$((RANDOM%${#arr[@]}))]}, this is `basename $SHELL`."
+
+else
+
+arr=(\
+"Safe Journey" \
+"Adieu" \
+"All the best" \
+"Au revoir" \
+"Best wishes" \
+"The best" \
+"Best" \
+"Catch you around" \
+"Catch you later" \
+"Catcha" \
+"Catch you on the flip side" \
+"Check you later" \
+"Cheers" \
+"Cheerio" \
+"Ciao" \
+"Ciao for now" \
+"Ciao-da" \
+"Continued success" \
+"Don't be a stranger" \
+"Farewell" \
+"Fare thee well" \
+"God be with you" \
+"God bless you" \
+"Godspeed" \
+"Go in peace" \
+"Goodbye" \
+"Goodbye, for now" \
+"Bye" \
+"Bye-bye" \
+"B'bye" \
+"Happy trails to you" \
+"Happy trails" \
+"I'm outty" \
+"'Kay, den" \
+"Keep it real" \
+"Keep it relevant" \
+"Miss you already" \
+"Peace be with you" \
+"Peace" \
+"Peace out" \
+"Deuces" \
+"See you around" \
+"See you later" \
+"See you" \
+"See ya" \
+"Later" \
+"Laters" \
+"Later, skater" \
+"S'later" \
+"See you later, alligator" \
+"Later, alligator" \
+"See you, wouldn't want to be you" \
+"Smell you later" \
+"See you in a while" \
+"In a while" \
+"In a while, crocodile" \
+"See you in the funny pages" \
+"See you on the flip side" \
+"See you on the other side" \
+"See you soon" \
+"Shoots" \
+"So long" \
+"Some other time" \
+"Some other time, then" \
+"Spot you later" \
+"Spot you" \
+"Stay happy" \
+"Take it easy" \
+"Take care" \
+"Talk to you later" \
+"Ta-ta" \
+"Ta-ta, for now" \
+"TTFN" \
+"Think of me" \
+"Think of me while you're gone" \
+"Till next time" \
+"Toodle-oo" \
+"Toodles" \
+"Up! Up! and away!!" \
+"Vale" \
+"Safe home" \
+"Be careful" \
+"Be gone" \
+"Be gone with you" \
+"Be good" \
+"Be off" \
+"Be off with you" \
+"Be safe" \
+"Be wise" \
+"Bon Voyage" \
+"Break a leg" \
+"Buck up" \
+"Buzz Off" \
+"Deuces" \
+"Don't do anything I wouldn't do" \
+"Do well" \
+"Drive safe" \
+"Fly a kite" \
+"Go fuck yourself" \
+"Go" \
+"Go away" \
+"Go on" \
+"Good luck" \
+"Good luck to you" \
+"Good riddance" \
+"Have a good day" \
+"Good day" \
+"Good day to you" \
+"Have a good evening" \
+"Good evening" \
+"Have a good night" \
+"Goodnight" \
+"Night" \
+"Have a good one" \
+"Have a nice day" \
+"Have fun" \
+"Hugs and Kisses" \
+"XOXO" \
+"Well, I'm off" \
+"Jog on" \
+"Keep a stiff upper lip" \
+"Keep healthy" \
+"Keep it going" \
+"Keep it up" \
+"Keep strong" \
+"Keep truckin'" \
+"Keep the faith" \
+"Keep warm" \
+"Keep well" \
+"Leave" \
+"Leave me be" \
+"Leave me alone" \
+"Let me alone" \
+"Let me be" \
+"Love" \
+"I Love you" \
+"Love ya" \
+"Lotsa Love" \
+"Make like a banana and split" \
+"Make like a tree and leave" \
+"Off" \
+"Off with you" \
+"On your bike" \
+"Pack light" \
+"Pack well" \
+"Piss Off" \
+"Remember me" \
+"Scram" \
+"See you in a bit" \
+"In a bit" \
+"See you in Hell" \
+"Send my regards" \
+"Send postcards" \
+"Stay up" \
+"Stay strong" \
+"Stay warm" \
+"Take a hike" \
+"Travel light" \
+"Wish I could come" \
+"With you in spirit" \
+"Write letters" \
+"Write to me" \
+"As-Salamu Alaykum" \
+"Salam")
+arr=( "${arr[@]}" )
+echo "${arr[$((RANDOM%${#arr[@]}))]}, `basename $SHELL` out."
+fi
+echo ""
+graceful_exit
+
