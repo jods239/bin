@@ -1,0 +1,270 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+#jods: dependecies (debian): python-imaging
+
+__author__ = "Markus Stumpf <mailto:srv-src-cleanthumbs@maexotic.de>"
+__source__ = "http://software.maexotic.de/python/cleanthumbs/>"
+__version = "1.0"
+__license__ = """Copyright (c) 2010 Markus Stumpf. All rights reserved.
+See http://software.maexotic.de/python/cleanthumbs/license.txt for
+the full text of the license."""
+
+import os
+import sys
+import getopt
+import Image
+from urlparse import urlparse
+from urllib import unquote
+
+# known software that creates the thumbnails - currently unused
+KNOWN_SOFTWARE = ( 'GNOME::ThumbnailFactory', 'GIMP 2.6.8' )
+
+# directories with thumbnails to check
+dirs_to_check = (
+    ".thumbnails",
+    ".cache/thumbnails",
+    )
+
+# default controls
+term_color = {
+    "bold"		: "\033[1m",
+    "norm"		: "\033[m",
+    }
+
+# options with defaults
+opts = {
+    "always-remove"	: None,
+    "dry-run"		: False,
+    "stderr-terminal"	: True,
+    "keep-nonlocal"	: False,
+    "verbose"		: 1,
+    }
+
+# holds the number of thumbnails that where chacked / deleted
+thumbs_checked = 0
+thumbs_removed = 0
+
+# ------------------------------------------------------------------------
+def help():
+    hmsg = """
+options are:
+        --always-remove=PATH	always remove thumbnails of local images
+				whose location starts with PATH. Be sure
+				to add a trailing "/" if you want a directory.
+				May be specified more than once.
+				    Eg. --always-remove=/media/cdrom/
+    -h, --help			display this message
+    -k, --keep-nonlocal		don't delete thumbnails that are not
+				associated with local files (eg. http://..)
+    -q, --quiet			suppress non-error messages
+    -n, --dry-run		trial run, don't delete any thumbnails.
+				Most useful with increased verbosity
+    -v, --verbose		increase verbosity. May be specified more
+				than once (more than 2 currently useless).
+"""
+    sys.stdout.write(hmsg)
+    sys.stdout.flush()
+    sys.exit(0)
+
+# ------------------------------------------------------------------------
+def warn(m):
+    """write messages to stderr eventually highlighting them"""
+
+    if opts['stderr-terminal']:
+	sys.stderr.write(term_color["bold"])
+    sys.stderr.write(m.rstrip("\r\n"))
+    if opts['stderr-terminal']:
+	sys.stderr.write(term_color["norm"])
+    sys.stderr.write("\n")
+    sys.stderr.flush()
+    return
+
+# ------------------------------------------------------------------------
+def termsetup():
+    """try to setup enhanced output mode for highlighting messages"""
+    # if stdout and stderr are both to a terminal use
+    # terminal control codes to make warnings bold
+
+    try:
+	import curses
+    except Exception, e:
+	opts["stderr-terminal"] = False
+	if 1 < opts["verbose"]:
+	    warn("Warning: %s: disabling enhanced terminal support" % e)
+	return
+
+    # got curses, now try to setup the terminal and get control codes
+    try:
+	curses.setupterm()
+	term_color["bold"] = curses.tigetstr("bold")
+	term_color["norm"] = curses.tigetstr("sgr0")
+    except Exception, e:
+	opts["stderr-terminal"] = False
+	if 1 < opts["verbose"]:
+	    warn("Warning: %s: disabling enhanced terminal support" % e)
+	warn("Warning: %s: disabling enhanced terminal support" % e)
+        return
+
+    # check if stderr is to a terminal
+    # if it is not, don't use codes
+    try:
+	os.ttyname(file.fileno(sys.stderr))
+	opts["stderr-terminal"] = True
+    except OSError:
+	opts["stderr-terminal"] = False
+	return
+
+    # ok, stderr is to a terminal
+    # now check if stdout is also to a terminal
+    # if stdout is different from stderr, don't use codes
+    try:
+	os.ttyname(file.fileno(sys.stdout))
+    except OSError:
+	opts["stderr-terminal"] = False
+
+    return
+
+# ------------------------------------------------------------------------
+def parse_options():
+    longopts = [
+	"always-remove=",
+	"dry-run",
+	"help",
+	"keep-nonlocal",
+	"quiet",
+	"verbose="
+	]
+    try:
+        gopts, cmds = getopt.getopt(sys.argv[1:], 'hknqv', longopts)
+    except getopt.GetoptError, m:
+	sys.stderr.write("Error: %s\n" % m)
+	sys.stderr.flush()
+	sys.exit(1)
+
+    if cmds:
+        sys.stderr.write("Error: extraneous parameter(s): %s\n" %
+		(", ".join(cmds)))
+	sys.stderr.flush()
+        sys.exit(1)
+
+    for o, a in gopts:
+	if   o == "--always-remove":
+	    if None is opts["always-remove"]:
+		opts["always-remove"] = [ a ]
+	    else: opts["always-remove"].append(a)
+	elif o == "-h" or o == "--help":
+	    help()
+	elif o == "-k" or o == "--keep-nonlocal":
+	    opts["keep-nonlocal"] = True
+	elif o == "-n" or o == "--dry-run":
+	    opts["dry-run"] = True
+	elif o == "-q" or o == "--quiet":
+	    opts["verbose"] = 0
+	elif o == "-v":
+	    opts["verbose"] += 1
+	elif o == "--verbose":
+	    opts["verbose"] = int(a)
+	else:
+	    sys.stderr.write("Internal error: cannot handle option '%s'\n" % o)
+	    sys.stderr.flush()
+	    sys.exit(1)
+    return
+
+# ------------------------------------------------------------------------
+def have_imagefile(uri):
+    """parse the URI found in the PNG file and check if image exists"""
+    (scheme, netloc, path, params, query, fragment) = urlparse(unquote(uri))
+
+    # check if the local image still exists
+    if "file" == scheme:
+	if opts["always-remove"]:
+	    for p in opts["always-remove"]:
+		if path.startswith(p):
+		    return(False)
+	return os.path.isfile(path)
+
+    # schemes that are not "file" (like "http") cannot be checked easily
+    return opts["keep-nonlocal"]
+
+# ------------------------------------------------------------------------
+def handle_dir(dir):
+    global thumbs_removed
+    global thumbs_checked
+
+    if 1 < opts["verbose"]:
+        print "cleaning directory '%s'" % dir
+
+    for fn in os.listdir(dir):
+	ifn = os.path.join(dir, fn)
+
+        if 2 < opts["verbose"]:
+	    print "checking '%s'" % ifn
+
+	if not os.path.isfile(ifn):
+	    handle_dir(ifn)   
+	    continue
+
+        thumbs_checked += 1
+
+	if not ifn.endswith(".png"):
+	    warn("Warning: does not end with .png: '%s'" % ifn)
+	    continue
+
+	try:
+	    img = Image.open(ifn)
+	except Exception, e:
+	    warn("Warning: Image.open() failed: %s" % e)
+	    warn("    for file '%s'" % ifn)
+	    continue
+
+#        if img.info.has_key("Software"):
+#	    software = img.info["Software"]
+#	    if "GNOME::ThumbnailFactory" != software:
+#	        print "Info: creator '%s'" % software
+
+	# can only do the job if there is info about
+	# the image the thumb is created from
+	if img.info.has_key("Thumb::URI"):
+	    uri = img.info["Thumb::URI"]
+	    un_uri = unquote(uri)
+	    if 2 < opts["verbose"]:
+		print "    uri '%s'" % uri
+	    if not have_imagefile(uri):
+		if not opts["dry-run"]:
+		    if 1 < opts["verbose"]:
+			print "removing '%s' (%s)" % (ifn, un_uri)
+		    try:
+		        os.unlink(ifn)
+		        thumbs_removed += 1
+		    except Exception, e:
+			warn("Error: %s: file '%s'" % (e, ifn))
+		else:
+		    if 1 < opts["verbose"]:
+			print "dry-run: not removing '%s' (%s)" % (ifn, un_uri)
+	else:
+	    warn("Warning: Thumb::URI not found in '%s'" % ifn)
+
+# ------------------------------------------------------------------------
+if __name__ == "__main__":
+
+    parse_options()
+    termsetup()
+	
+    homedir = os.path.expanduser("~")
+    for d in dirs_to_check:
+	dir = os.path.join(homedir, d)
+	if not os.path.exists(dir):
+	    warn("Warning: no such file or directory: '%s'" % dir)
+	    continue
+	if not os.path.isdir(dir):
+	    warn("Warning: not a directory: '%s'" % dir)
+	    continue
+	handle_dir(dir)
+
+    if 0 < opts["verbose"]:
+        print "%d of %d thumbnail image(s) have been removed." % \
+		(thumbs_removed, thumbs_checked)
+
+    sys.exit(0)
+
